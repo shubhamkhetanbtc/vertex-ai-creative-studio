@@ -7,6 +7,12 @@ PROJECT_ID=
 #MODEL_ID= 
 # GENMEDIA_BUCKET defaults to: {PROJECT_ID}-assets
 #GENMEDIA_BUCKET=
+# App environment ("", "local", "dev", "prod")
+#APP_ENV=
+# Enable/disable budget checks (true/false)
+#BUDGET_CHECK_ENABLED=true
+# Analytics (optional)
+#GA_MEASUREMENT_ID=
 
 #### Veo
 # VEO_PROJECT_ID defaults to PROJECT_ID if not present
@@ -21,3 +27,13 @@ PROJECT_ID=
 #LYRIA_MODEL_VERSION=
 # LYRIA_PROJECT_ID defaults to PROJECT_ID f not present
 #LYRIA_PROJECT_ID=
+
+#### Budget & Billing
+# Firestore DB and collections for budgets feature
+#BUDGET_DB_ID=creative-studio-budget-allocation
+#BUDGET_USERS_COLLECTION=users
+#BUDGETS_COLLECTION=budgets
+# BigQuery billing export identifiers (optional; set when BUDGET_CHECK_ENABLED=true)
+#BILLING_PROJECT_ID=
+#BILLING_DATASET=
+#BILLING_TABLE=

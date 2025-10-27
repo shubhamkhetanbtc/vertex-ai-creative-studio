@@ -59,6 +59,7 @@ module "project-services" {
     "containerscanning.googleapis.com",
     "storage.googleapis.com",
     "aiplatform.googleapis.com",
+    "bigquery.googleapis.com",
     "firestore.googleapis.com",
     "serviceusage.googleapis.com",
     "cloudresourcemanager.googleapis.com",
@@ -165,6 +166,19 @@ locals {
     GENMEDIA_FIREBASE_DB  = google_firestore_database.create_studio_asset_metadata.name
     SERVICE_ACCOUNT_EMAIL = google_service_account.creative_studio.email
     EDIT_IMAGES_ENABLED   = var.edit_images_enabled
+  # App/env flags
+  APP_ENV               = var.app_env
+  BUDGET_CHECK_ENABLED  = tostring(var.budget_check_enabled)
+  # Budget Firestore config
+  BUDGET_DB_ID          = var.budget_db_id
+  BUDGET_USERS_COLLECTION = var.budget_users_collection
+  BUDGETS_COLLECTION    = var.budgets_collection
+  # Billing export config (optional)
+  BILLING_PROJECT_ID    = coalesce(var.billing_project_id, var.project_id)
+  BILLING_DATASET       = var.billing_dataset
+  BILLING_TABLE         = var.billing_table
+  # Analytics (optional)
+  GA_MEASUREMENT_ID     = var.ga_measurement_id
   }
 
   deployed_domain = var.use_lb ? ["https://${var.domain}"] : google_cloud_run_v2_service.creative_studio.urls
@@ -298,6 +312,38 @@ resource "google_firestore_database" "create_studio_asset_metadata" {
   depends_on      = [null_resource.sleep]
 }
 
+# Firestore database for budgets and users collections used by budget gating
+resource "google_firestore_database" "budget_allocation" {
+  name                              = "creative-studio-budget-allocation"
+  location_id                       = var.region
+  type                              = "FIRESTORE_NATIVE"
+  concurrency_mode                  = "OPTIMISTIC"
+  app_engine_integration_mode       = "DISABLED"
+  point_in_time_recovery_enablement = "POINT_IN_TIME_RECOVERY_ENABLED"
+  delete_protection_state           = var.enable_data_deletion ? "DELETE_PROTECTION_DISABLED" : "DELETE_PROTECTION_ENABLED"
+  deletion_policy                   = var.enable_data_deletion ? "DELETE" : "ABANDON"
+  depends_on                        = [null_resource.sleep]
+}
+
+# Bootstrap documents to ensure collections exist (no-op for production logic)
+resource "google_firestore_document" "budget_collection_bootstrap" {
+  project      = var.project_id
+  database     = google_firestore_database.budget_allocation.name
+  collection   = "budgets"
+  document_id  = "__bootstrap"
+  fields       = jsonencode({ initialized = { booleanValue = true } })
+  depends_on   = [google_firestore_database.budget_allocation]
+}
+
+resource "google_firestore_document" "users_collection_bootstrap" {
+  project      = var.project_id
+  database     = google_firestore_database.budget_allocation.name
+  collection   = "users"
+  document_id  = "__bootstrap"
+  fields       = jsonencode({ initialized = { booleanValue = true } })
+  depends_on   = [google_firestore_database.budget_allocation]
+}
+
 resource "google_firestore_index" "genmedia_library_mime_type_timestamp" {
   collection  = "genmedia"
   database    = google_firestore_database.create_studio_asset_metadata.name
@@ -340,9 +386,33 @@ resource "google_project_iam_member" "creative_studio_db_access" {
   }
 }
 
+# Grant the service account access to the budgets database as well
+resource "google_project_iam_member" "creative_studio_budget_db_access" {
+  project = var.project_id
+  role    = "roles/datastore.user"
+  member  = google_service_account.creative_studio.member
+  condition {
+    title      = "Access to Creative Studio Budget Allocation DB"
+    expression = "resource.name==\"${google_firestore_database.budget_allocation.id}\""
+  }
+}
+
 resource "google_project_iam_member" "creative_studio_vertex_access" {
   project = var.project_id
   role    = "roles/aiplatform.user"
+  member  = google_service_account.creative_studio.member
+}
+
+# Grant BigQuery access on the billing project (defaults to service project)
+resource "google_project_iam_member" "creative_studio_bq_job_user" {
+  project = coalesce(var.billing_project_id, var.project_id)
+  role    = "roles/bigquery.jobUser"
+  member  = google_service_account.creative_studio.member
+}
+
+resource "google_project_iam_member" "creative_studio_bq_data_viewer" {
+  project = coalesce(var.billing_project_id, var.project_id)
+  role    = "roles/bigquery.dataViewer"
   member  = google_service_account.creative_studio.member
 }
 

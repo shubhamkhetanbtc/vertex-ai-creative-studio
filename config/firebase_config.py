@@ -12,29 +12,41 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
+from typing import Optional, Dict
 import firebase_admin
 from firebase_admin import credentials, firestore
+from config.default import Default
+
 
 class FirebaseClient:
-    """Firebase client singleton class"""
-    _instance = None
-    _client = None
+    """Firestore client manager supporting multiple database IDs.
 
-    def __new__(cls, database_id: Optional[str] = None):
-        if cls._instance is None:
-            cls._instance = super(FirebaseClient, cls).__new__(cls)
-            cls._instance._initialize(database_id)
-        return cls._instance
+    This avoids binding the entire process to the first database requested.
+    It caches a client per database_id and initializes firebase_admin once.
+    """
 
-    def _initialize(self, database_id: Optional[str] = None):
-        try:
-            cred = credentials.ApplicationDefault()
-            firebase_admin.initialize_app(cred)
-            print(f"[FirebaseClient] - initiating firebase client with `{database_id}`")
-        except ValueError:
-            print("[FirebaseClient] - Firebase already initialized.")
-        self._client = firestore.client(database_id=database_id)
+    _app_initialized: bool = False
+    _clients: Dict[str, firestore.Client] = {}
 
-    def get_client(self):
-        return self._client
+    def __init__(self, database_id: Optional[str] = None):
+        # Default Firestore database id when not provided
+        self._database_id = database_id or "(default)"
+        if not FirebaseClient._app_initialized:
+            try:
+                cred = credentials.ApplicationDefault()
+                # Initialize with explicit project to avoid ADC project drift.
+                firebase_admin.initialize_app(cred, {"projectId": Default().PROJECT_ID})
+            except ValueError:
+                # Already initialized elsewhere
+                pass
+            FirebaseClient._app_initialized = True
+
+    def get_client(self) -> firestore.Client:
+        # Return cached client or create a new one for this database id
+        db_id = self._database_id
+        client = FirebaseClient._clients.get(db_id)
+        if client is None:
+            # Use database_id for the installed firebase_admin version and rely on initialize_app(projectId=...).
+            client = firestore.client(database_id=db_id)
+            FirebaseClient._clients[db_id] = client
+        return client
