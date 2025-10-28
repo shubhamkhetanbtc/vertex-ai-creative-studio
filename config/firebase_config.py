@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from typing import Optional, Dict
+import os
 import firebase_admin
 from firebase_admin import credentials, firestore
 from config.default import Default
@@ -33,9 +34,14 @@ class FirebaseClient:
         self._database_id = database_id or "(default)"
         if not FirebaseClient._app_initialized:
             try:
+                # Ensure project id is available to google.auth.default to avoid gcloud subprocess calls
+                project_id = Default().PROJECT_ID
+                if project_id:
+                    os.environ.setdefault("GOOGLE_CLOUD_PROJECT", project_id)
+                    os.environ.setdefault("GCP_PROJECT", project_id)
                 cred = credentials.ApplicationDefault()
                 # Initialize with explicit project to avoid ADC project drift.
-                firebase_admin.initialize_app(cred, {"projectId": Default().PROJECT_ID})
+                firebase_admin.initialize_app(cred, {"projectId": project_id})
             except ValueError:
                 # Already initialized elsewhere
                 pass

@@ -173,6 +173,7 @@ locals {
   BUDGET_DB_ID          = var.budget_db_id
   BUDGET_USERS_COLLECTION = var.budget_users_collection
   BUDGETS_COLLECTION    = var.budgets_collection
+  BUDGET_DEPARTMENTS    = var.budget_departments
   # Billing export config (optional)
   BILLING_PROJECT_ID    = coalesce(var.billing_project_id, var.project_id)
   BILLING_DATASET       = var.billing_dataset
@@ -403,18 +404,23 @@ resource "google_project_iam_member" "creative_studio_vertex_access" {
   member  = google_service_account.creative_studio.member
 }
 
-# Grant BigQuery access on the billing project (defaults to service project)
-resource "google_project_iam_member" "creative_studio_bq_job_user" {
-  project = coalesce(var.billing_project_id, var.project_id)
-  role    = "roles/bigquery.jobUser"
-  member  = google_service_account.creative_studio.member
-}
 
-resource "google_project_iam_member" "creative_studio_bq_data_viewer" {
-  project = coalesce(var.billing_project_id, var.project_id)
-  role    = "roles/bigquery.dataViewer"
-  member  = google_service_account.creative_studio.member
-}
+// TODO: Re-enable these cross-project IAM grants once the Terraform runner has IAM admin on the billing project.
+// Required: The identity applying Terraform must have permission to modify IAM on project `var.billing_project_id`
+// (e.g., roles/resourcemanager.projectIamAdmin or roles/iam.securityAdmin). Otherwise, apply will fail with 403.
+//
+// Grant BigQuery access on the billing project (defaults to service project)
+// resource "google_project_iam_member" "creative_studio_bq_job_user" {
+//   project = coalesce(var.billing_project_id, var.project_id)
+//   role    = "roles/bigquery.jobUser"
+//   member  = google_service_account.creative_studio.member
+// }
+//
+// resource "google_project_iam_member" "creative_studio_bq_data_viewer" {
+//   project = coalesce(var.billing_project_id, var.project_id)
+//   role    = "roles/bigquery.dataViewer"
+//   member  = google_service_account.creative_studio.member
+// }
 
 /********************************************
 *  Build time Resources Section

@@ -155,3 +155,10 @@ variable "ga_measurement_id" {
   type        = string
   default     = null
 }
+
+# Comma-separated departments list for onboarding (e.g., "Sales,Marketing,Engineering")
+variable "budget_departments" {
+  description = "Comma-separated list of departments for onboarding."
+  type        = string
+  default     = "Sales,Marketing,Development"
+}

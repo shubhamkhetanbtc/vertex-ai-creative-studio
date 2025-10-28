@@ -13,9 +13,6 @@ from models import budget as budget_service
 from state.state import AppState
 
 
-DEPARTMENTS = ["Marketing", "Sales", "Development"]
-
-
 @me.stateclass
 class PageState:
     selected_department: str | None = None
@@ -24,6 +21,8 @@ class PageState:
     error_dialog_open: bool = False
     error_message: str = ""
     current_budget: float | None = None
+    current_cost: float | None = None
+    edit_dialog_open: bool = False
 
 
 def on_click_update_budget(e: me.ClickEvent):  # pylint: disable=unused-argument
@@ -42,10 +41,14 @@ def on_click_update_budget(e: me.ClickEvent):  # pylint: disable=unused-argument
         # Re-check budget for the current user; if within budget, go home
         status = budget_service.evaluate_budget(app.user_email)
         if status.within_budget:
+            st.edit_dialog_open = False
+            st.new_budget_input = ""
             me.navigate("/home")
         else:
-            st.info_message = f"Budget for {st.selected_department} set to €{amount:,.2f}."
             st.current_budget = amount
+            st.current_cost = status.monthly_cost
+            st.edit_dialog_open = False
+            st.new_budget_input = ""
         yield
     except Exception as ex:  # noqa: BLE001
         st.error_message = f"Failed to update budget: {ex}"
@@ -61,16 +64,6 @@ def on_budget_input(e):
     except Exception:
         # Fallback: ignore if structure differs
         pass
-    yield
-
-
-def on_department_change(e: me.SelectSelectionChangeEvent):
-    st = me.state(PageState)
-    st.selected_department = e.value
-    try:
-        st.current_budget = budget_service.get_department_budget(st.selected_department)
-    except Exception:
-        st.current_budget = None
     yield
 
 
@@ -92,65 +85,139 @@ def budget_exceeded_content():
             st.current_budget = budget_service.get_department_budget(st.selected_department)
         except Exception:
             st.current_budget = None
+        # Load current monthly cloud cost
+        try:
+            st.current_cost = budget_service.get_monthly_cloud_cost()
+        except Exception:
+            st.current_cost = None
+    # Determine user role for permissions
+    role = None
+    try:
+        role = budget_service.get_user_role(app.user_email)
+    except Exception:
+        role = None
+
     with page_frame():  # pylint: disable=E1129:not-context-manager
-        header("Budget Exceeded", "warning")
+        # Big centered title row with warning icon
+        with me.box(style=me.Style(display="flex", justify_content="center", margin=me.Margin(top=24))):
+            with me.box(style=me.Style(display="flex", align_items="center", gap=12)):
+                me.text("⚠", type="headline-4", style=me.Style(color=me.theme_var("error")))
+                me.text(
+                    "Budget Exceeded",
+                    type="headline-4",
+                    style=me.Style(color=me.theme_var("error"), font_family="Google Sans"),
+                )
 
-        with me.box(style=me.Style(display="flex", flex_direction="column", gap=16, max_width="720px")):
-            me.text("Access is temporarily blocked because monthly costs exceed the allocated budget for your department.")
-            me.text(f"Signed in as: {app.user_email}")
-
-            me.divider()
-            me.text("Edit Department Budget", type="headline-5")
-            # Ensure user's department appears in the options
-            _options = DEPARTMENTS if dept in DEPARTMENTS else (DEPARTMENTS + [dept])
-            me.select(
-                label="Department",
-                options=[me.SelectOption(label=k, value=k) for k in _options],
-                value=st.selected_department or "",
-                on_selection_change=on_department_change,
+        with me.box(style=me.Style(display="flex", justify_content="center", margin=me.Margin(top=12))):
+            me.text(
+                "Access is temporarily blocked because monthly costs exceed your department’s budget.",
+                type="body-1",
+                style=me.Style(color=me.theme_var("error")),
             )
-            # Show current budget or a helpful message
-            if st.selected_department:
-                if st.current_budget is not None:
-                    me.text(
-                        f"Current budget for {st.selected_department}: €{st.current_budget:,.2f}",
-                        style=me.Style(margin=me.Margin(top=8)),
-                    )
-                else:
-                    me.text(
-                        "No budget exists for the selected department, please set a new budget.",
-                        style=me.Style(margin=me.Margin(top=8)),
-                    )
-            me.textarea(
-                label="New monthly budget (EUR)",
-                value=st.new_budget_input,
-                rows=1,
-                on_blur=on_budget_input,
-                style=me.Style(width="320px"),
-            )
-            with me.box(style=me.Style(display="flex", gap=12)):
-                me.button("Update Budget", on_click=on_click_update_budget)
-                me.button("Back to Home", on_click=_go_home, type="flat")
 
-            if st.info_message:
-                me.text(st.info_message, style=me.Style(color=me.theme_var("on-tertiary-container")))
+        with me.box(style=me.Style(display="flex", justify_content="center", margin=me.Margin(top=24))):
+            with me.box(
+                style=me.Style(
+                    background=me.theme_var("surface"),
+                    border_radius=16,
+                    box_shadow=me.theme_var("shadow_elevation_2"),
+                    padding=me.Padding.all(24),
+                    width="min(720px, 100%)",
+                    display="flex",
+                    flex_direction="column",
+                    gap=16,
+                )
+            ):
+                # Simple 4-row table: label left, value right (use dividers between rows)
+                def _row(label: str, value: str):
+                    with me.box(
+                        style=me.Style(
+                            display="flex",
+                            justify_content="space-between",
+                            align_items="center",
+                            padding=me.Padding(top=8, bottom=8),
+                        )
+                    ):
+                        me.text(label, type="subtitle-2", style=me.Style(color=me.theme_var("error")))
+                        me.text(value, type="body-1", style=me.Style(color=me.theme_var("error")))
+
+                dept_label = st.selected_department or dept or "—"
+                cost_label = (
+                    f"€{st.current_cost:,.2f}" if st.current_cost is not None else "Unavailable"
+                )
+                budget_label = (
+                    f"€{st.current_budget:,.2f}" if st.current_budget is not None else "Not set"
+                )
+
+                _row("User email", app.user_email)
+                me.divider()
+                _row("Department", dept_label)
+                me.divider()
+                _row("Current monthly cost", cost_label)
+                me.divider()
+                _row("Budget", budget_label)
+
+                with me.box(style=me.Style(display="flex", justify_content="flex-end", margin=me.Margin(top=8))):
+                    if role == "admin":
+                        me.button(
+                            "Update Budget",
+                            on_click=_open_edit_dialog,
+                            style=me.Style(
+                                background=me.theme_var("primary"),
+                                color=me.theme_var("on-primary"),
+                                padding=me.Padding(top=10, bottom=10, left=16, right=16),
+                                border_radius=24,
+                                font_weight="600",
+                            ),
+                        )
+
+            # Removed inline editor and any informational flash message; modal handles updates
 
         if st.error_dialog_open:
             with dialog(is_open=st.error_dialog_open):  # pylint: disable=E1129:not-context-manager
-                me.text("Error", type="headline-6", style=me.Style(color=me.theme_var("error")))
+                me.text("Error", type="headline-6", style=me.Style(color=me.theme_var("error"), font_family="Google Sans"))
                 me.text(st.error_message, style=me.Style(margin=me.Margin(top=12)))
                 with dialog_actions():  # pylint: disable=E1129:not-context-manager
                     me.button("Close", on_click=_close_error_dialog, type="flat")
 
+        # Update Budget modal
+        if st.edit_dialog_open:
+            with dialog(is_open=st.edit_dialog_open):  # pylint: disable=E1129:not-context-manager
+                me.text("Update Budget", type="headline-6", style=me.Style(font_family="Google Sans"))
+                with me.box(style=me.Style(display="flex", flex_direction="column", gap=12, margin=me.Margin(top=12))):
+                    me.text("Department", type="subtitle-2", style=me.Style(color=me.theme_var("on-tertiary-container")))
+                    me.text(st.selected_department or dept or "—")
+                    me.text("New monthly budget (EUR)", type="subtitle-2", style=me.Style(color=me.theme_var("on-tertiary-container")))
+                    me.textarea(
+                        label="Enter amount",
+                        value=st.new_budget_input,
+                        rows=1,
+                        on_blur=on_budget_input,
+                        style=me.Style(width="320px"),
+                    )
+                with dialog_actions():  # pylint: disable=E1129:not-context-manager
+                    me.button("Cancel", on_click=_close_edit_dialog)
+                    me.button("Save", on_click=on_click_update_budget, type="flat")
 
-def _go_home(e: me.ClickEvent):  # pylint: disable=unused-argument
-    me.navigate("/home")
-    yield
 
 
 def _close_error_dialog(e: me.ClickEvent):  # pylint: disable=unused-argument
     st = me.state(PageState)
     st.error_dialog_open = False
+    yield
+
+
+def _open_edit_dialog(e: me.ClickEvent):  # pylint: disable=unused-argument
+    st = me.state(PageState)
+    # Pre-fill with current budget if available
+    st.new_budget_input = "" if st.current_budget is None else f"{st.current_budget:.2f}"
+    st.edit_dialog_open = True
+    yield
+
+
+def _close_edit_dialog(e: me.ClickEvent):  # pylint: disable=unused-argument
+    st = me.state(PageState)
+    st.edit_dialog_open = False
     yield
 
 

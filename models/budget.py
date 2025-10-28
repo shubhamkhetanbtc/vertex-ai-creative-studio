@@ -54,12 +54,13 @@ def get_user_department(email: str) -> Optional[str]:
     return None
 
 
-def upsert_user_department(email: str, department: str) -> None:
-    """Creates or updates a user's department in the users collection."""
+def upsert_user_department(email: str, department: str, role: Optional[str] = None) -> None:
+    """Creates or updates a user's department (and optional Project_Role) in the users collection."""
     db = _budget_db()
-    db.collection(cfg.BUDGET_USERS_COLLECTION).document(email).set(
-        {"department": department}, merge=True
-    )
+    payload = {"department": department}
+    if role:
+        payload.update({"Project_Role": role})
+    db.collection(cfg.BUDGET_USERS_COLLECTION).document(email).set(payload, merge=True)
 
 
 def get_department_budget(department: str) -> Optional[float]:
@@ -87,6 +88,43 @@ def set_department_budget(department: str, amount: float) -> None:
     db.collection(cfg.BUDGETS_COLLECTION).document(department).set(
         {"amount": float(amount)}, merge=True
     )
+
+
+def list_departments() -> list[str]:
+    """Returns a list of department names based on documents in the budgets collection."""
+    try:
+        db = _budget_db()
+        docs = db.collection(cfg.BUDGETS_COLLECTION).stream()
+        names = [d.id for d in docs]
+        # Remove empties and sort for stable UI
+        return sorted([n for n in names if isinstance(n, str) and n])
+    except Exception:
+        return []
+
+
+def upsert_user_profile(email: str, department: str, role: str) -> None:
+    """Creates or updates a user's profile (department and role)."""
+    db = _budget_db()
+    db.collection(cfg.BUDGET_USERS_COLLECTION).document(email).set(
+        {"department": department, "role": role}, merge=True
+    )
+
+
+def get_user_role(email: str) -> Optional[str]:
+    """Fetches the user's role from users collection.
+
+    Checks both "Project_Role" and legacy "role" fields.
+    Returns a lowercase role string (e.g., "admin", "user") or None.
+    """
+    db = _budget_db()
+    doc = db.collection(cfg.BUDGET_USERS_COLLECTION).document(email).get()
+    if not doc.exists:
+        return None
+    data = doc.to_dict() or {}
+    role = data.get("Project_Role") or data.get("role")
+    if isinstance(role, str) and role:
+        return role.strip().lower()
+    return None
 
 
 def get_monthly_cloud_cost(project_id: Optional[str] = None) -> Optional[float]:

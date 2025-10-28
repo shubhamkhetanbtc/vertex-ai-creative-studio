@@ -186,6 +186,8 @@ class Default:
     )
     BUDGET_USERS_COLLECTION: str = os.environ.get("BUDGET_USERS_COLLECTION", "users")
     BUDGETS_COLLECTION: str = os.environ.get("BUDGETS_COLLECTION", "budgets")
+    # Comma-separated department list for onboarding (e.g., "Sales,Marketing,Engineering")
+    BUDGET_DEPARTMENTS: str = os.environ.get("BUDGET_DEPARTMENTS", "Sales,Marketing,Development")
 
     # Feature flag to disable budget checks if needed
     BUDGET_CHECK_ENABLED: bool = os.environ.get("BUDGET_CHECK_ENABLED", "true").lower() == "true"

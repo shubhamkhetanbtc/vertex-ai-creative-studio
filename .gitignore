@@ -9,6 +9,7 @@ __pycache__
 .vscode
 .DS_Store
 samples/
+.terraform.lock.hcl
 # gemini-cli settings
 .gemini/
 
