@@ -405,7 +405,7 @@ resource "google_project_iam_member" "creative_studio_vertex_access" {
 }
 
 
-// TODO: Re-enable these cross-project IAM grants once the Terraform runner has IAM admin on the billing project.
+// TODO: Re-enable these cross-project IAM grants once the Terraform runner has IAM admin on the billing project. Test
 // Required: The identity applying Terraform must have permission to modify IAM on project `var.billing_project_id`
 // (e.g., roles/resourcemanager.projectIamAdmin or roles/iam.securityAdmin). Otherwise, apply will fail with 403.
 //
