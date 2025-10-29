@@ -16,14 +16,12 @@ from config.default import Default
 from state.state import AppState
 from components.styles import PAGE_BACKGROUND_STYLE
 
-
 @me.stateclass
 class PageState:
     selected_department: str | None = None
     selected_role: str | None = None
     error_dialog_open: bool = False
     error_message: str = ""
-
 
 def on_click_save(e: me.ClickEvent):  # pylint: disable=unused-argument
     """Persist the selected department and role, then navigate."""
@@ -45,9 +43,9 @@ def on_click_save(e: me.ClickEvent):  # pylint: disable=unused-argument
         # Immediately verify budget and redirect accordingly
         status = budget_service.evaluate_budget(app.user_email)
         if status.error in ("missing_budget",) or (status.within_budget is False):
-            me.navigate("/budget_exceeded")
+            me.navigate("/access_restricted")
         else:
-            me.navigate("/home")
+            me.navigate("/welcome")
         yield
     except PermissionDenied as ex:
         cfg = Default()
@@ -66,8 +64,7 @@ def on_click_save(e: me.ClickEvent):  # pylint: disable=unused-argument
         st.error_dialog_open = True
         yield
 
-
-def setup_department_content():
+def setup_profile_content():
     app = me.state(AppState)
     st = me.state(PageState)
 
@@ -144,34 +141,29 @@ def setup_department_content():
                 with dialog_actions():  # pylint: disable=E1129:not-context-manager
                     me.button("Close", on_click=_close_error_dialog, type="flat")
 
-
 def _on_dept_change(e: me.SelectSelectionChangeEvent):
     st = me.state(PageState)
     st.selected_department = e.value
     yield
-
 
 def _on_role_change(e: me.SelectSelectionChangeEvent):
     st = me.state(PageState)
     st.selected_role = e.value
     yield
 
-
 def _navigate_home(e: me.ClickEvent):  # pylint: disable=unused-argument
     me.navigate("/home")
     yield
-
 
 def _close_error_dialog(e: me.ClickEvent):  # pylint: disable=unused-argument
     st = me.state(PageState)
     st.error_dialog_open = False
     yield
 
-
 @me.page(
-    path="/setup_department",
-    title="Setup Department - GenMedia Creative Studio",
+    path="/setup_profile",
+    title="Setup Profile - GenMedia Creative Studio",
 )
 def page():
-    with page_scaffold(page_name="setup_department"):  # pylint: disable=E1129:not-context-manager
-        setup_department_content()
+    with page_scaffold(page_name="setup_profile"):  # pylint: disable=E1129:not-context-manager
+        setup_profile_content()

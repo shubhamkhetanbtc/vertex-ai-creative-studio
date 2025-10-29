@@ -1,6 +1,6 @@
-"""Budget exceeded page with option to edit department budgets.
+"""Access restricted page for budget issues (exceeded or not set).
 
-Accessible when a user's department monthly cost exceeds allocated budget.
+Accessible when a user's department monthly cost exceeds allocated budget or no budget is set.
 Allows selecting a department and updating its budget.
 """
 
@@ -12,7 +12,6 @@ from components.page_scaffold import page_frame, page_scaffold
 from models import budget as budget_service
 from state.state import AppState
 
-
 @me.stateclass
 class PageState:
     selected_department: str | None = None
@@ -23,7 +22,6 @@ class PageState:
     current_budget: float | None = None
     current_cost: float | None = None
     edit_dialog_open: bool = False
-
 
 def on_click_update_budget(e: me.ClickEvent):  # pylint: disable=unused-argument
     st = me.state(PageState)
@@ -43,7 +41,7 @@ def on_click_update_budget(e: me.ClickEvent):  # pylint: disable=unused-argument
         if status.within_budget:
             st.edit_dialog_open = False
             st.new_budget_input = ""
-            me.navigate("/home")
+            me.navigate("/welcome")
         else:
             st.current_budget = amount
             st.current_cost = status.monthly_cost
@@ -55,7 +53,6 @@ def on_click_update_budget(e: me.ClickEvent):  # pylint: disable=unused-argument
         st.error_dialog_open = True
         yield
 
-
 def on_budget_input(e):
     st = me.state(PageState)
     try:
@@ -66,8 +63,7 @@ def on_budget_input(e):
         pass
     yield
 
-
-def budget_exceeded_content():
+def access_restricted_content():
     app = me.state(AppState)
     st = me.state(PageState)
     # If user has no department, bounce them to setup immediately
@@ -76,7 +72,7 @@ def budget_exceeded_content():
     except Exception:
         dept = None
     if not dept:
-        me.navigate("/setup_department")
+        me.navigate("/setup_profile")
         return
     # Default to user's department and load its current budget on first render
     if not st.selected_department:
@@ -96,25 +92,38 @@ def budget_exceeded_content():
         role = budget_service.get_user_role(app.user_email)
     except Exception:
         role = None
-
+    # Check if budget is missing for department
+    budget_missing = st.current_budget is None
     with page_frame():  # pylint: disable=E1129:not-context-manager
         # Big centered title row with warning icon
         with me.box(style=me.Style(display="flex", justify_content="center", margin=me.Margin(top=24))):
             with me.box(style=me.Style(display="flex", align_items="center", gap=12)):
                 me.text("⚠", type="headline-4", style=me.Style(color=me.theme_var("error")))
-                me.text(
-                    "Budget Exceeded",
-                    type="headline-4",
-                    style=me.Style(color=me.theme_var("error"), font_family="Google Sans"),
-                )
-
+                if budget_missing:
+                    me.text(
+                        "Budget Not Set",
+                        type="headline-4",
+                        style=me.Style(color=me.theme_var("error"), font_family="Google Sans"),
+                    )
+                else:
+                    me.text(
+                        "Budget Exceeded",
+                        type="headline-4",
+                        style=me.Style(color=me.theme_var("error"), font_family="Google Sans"),
+                    )
         with me.box(style=me.Style(display="flex", justify_content="center", margin=me.Margin(top=12))):
-            me.text(
-                "Access is temporarily blocked because monthly costs exceed your department’s budget.",
-                type="body-1",
-                style=me.Style(color=me.theme_var("error")),
-            )
-
+            if budget_missing:
+                me.text(
+                    "Access is blocked because no budget is set for your department. Please contact an admin to set a budget.",
+                    type="body-1",
+                    style=me.Style(color=me.theme_var("error")),
+                )
+            else:
+                me.text(
+                    "Access is temporarily blocked because monthly costs exceed your department’s budget.",
+                    type="body-1",
+                    style=me.Style(color=me.theme_var("error")),
+                )
         with me.box(style=me.Style(display="flex", justify_content="center", margin=me.Margin(top=24))):
             with me.box(
                 style=me.Style(
@@ -140,7 +149,6 @@ def budget_exceeded_content():
                     ):
                         me.text(label, type="subtitle-2", style=me.Style(color=me.theme_var("error")))
                         me.text(value, type="body-1", style=me.Style(color=me.theme_var("error")))
-
                 dept_label = st.selected_department or dept or "—"
                 cost_label = (
                     f"€{st.current_cost:,.2f}" if st.current_cost is not None else "Unavailable"
@@ -148,7 +156,6 @@ def budget_exceeded_content():
                 budget_label = (
                     f"€{st.current_budget:,.2f}" if st.current_budget is not None else "Not set"
                 )
-
                 _row("User email", app.user_email)
                 me.divider()
                 _row("Department", dept_label)
@@ -156,7 +163,6 @@ def budget_exceeded_content():
                 _row("Current monthly cost", cost_label)
                 me.divider()
                 _row("Budget", budget_label)
-
                 with me.box(style=me.Style(display="flex", justify_content="flex-end", margin=me.Margin(top=8))):
                     if role == "admin":
                         me.button(
@@ -170,16 +176,12 @@ def budget_exceeded_content():
                                 font_weight="600",
                             ),
                         )
-
-            # Removed inline editor and any informational flash message; modal handles updates
-
         if st.error_dialog_open:
             with dialog(is_open=st.error_dialog_open):  # pylint: disable=E1129:not-context-manager
                 me.text("Error", type="headline-6", style=me.Style(color=me.theme_var("error"), font_family="Google Sans"))
                 me.text(st.error_message, style=me.Style(margin=me.Margin(top=12)))
                 with dialog_actions():  # pylint: disable=E1129:not-context-manager
                     me.button("Close", on_click=_close_error_dialog, type="flat")
-
         # Update Budget modal
         if st.edit_dialog_open:
             with dialog(is_open=st.edit_dialog_open):  # pylint: disable=E1129:not-context-manager
@@ -199,13 +201,10 @@ def budget_exceeded_content():
                     me.button("Cancel", on_click=_close_edit_dialog)
                     me.button("Save", on_click=on_click_update_budget, type="flat")
 
-
-
 def _close_error_dialog(e: me.ClickEvent):  # pylint: disable=unused-argument
     st = me.state(PageState)
     st.error_dialog_open = False
     yield
-
 
 def _open_edit_dialog(e: me.ClickEvent):  # pylint: disable=unused-argument
     st = me.state(PageState)
@@ -214,17 +213,15 @@ def _open_edit_dialog(e: me.ClickEvent):  # pylint: disable=unused-argument
     st.edit_dialog_open = True
     yield
 
-
 def _close_edit_dialog(e: me.ClickEvent):  # pylint: disable=unused-argument
     st = me.state(PageState)
     st.edit_dialog_open = False
     yield
 
-
 @me.page(
-    path="/budget_exceeded",
-    title="Budget Exceeded - GenMedia Creative Studio",
+    path="/access_restricted",
+    title="Access Restricted - GenMedia Creative Studio",
 )
 def page():
-    with page_scaffold(page_name="budget_exceeded"):  # pylint: disable=E1129:not-context-manager
-        budget_exceeded_content()
+    with page_scaffold(page_name="access_restricted"):  # pylint: disable=E1129:not-context-manager
+        access_restricted_content()

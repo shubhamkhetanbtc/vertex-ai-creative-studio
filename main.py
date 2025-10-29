@@ -36,8 +36,8 @@ from common.utils import create_display_url
 from config import default as config
 from models.video_processing import convert_mp4_to_gif
 from pages import about as about_page
-from pages import setup_department as setup_department_page  # noqa: F401 - register page
-from pages import budget_exceeded as budget_exceeded_page  # noqa: F401 - register page
+from pages import setup_profile as setup_profile_page  # noqa: F401 - register page
+from pages import access_restricted as access_restricted_page  # noqa: F401 - register page
 from pages import banana_studio as banana_studio_page
 from pages import character_consistency as character_consistency_page
 from pages import chirp_3hd as chirp_3hd_page
@@ -82,6 +82,8 @@ class UserInfo(BaseModel):
 # FastAPI server with Mesop
 router = APIRouter()
 app.include_router(router)
+
+# Block manual navigation to onboarding/budget pages
 
 
 @app.get("/favicon.ico", include_in_schema=False)
@@ -187,8 +189,8 @@ async def set_request_context(request: Request, call_next):
         "/.well-known",
         "/api/",
         "/auth/",
-        "/setup_department",
-        "/budget_exceeded",
+        "/setup_profile",
+        "/access_restricted",
     )
     asset_exts = (
         ".js",
@@ -234,15 +236,15 @@ async def set_request_context(request: Request, call_next):
 
     # Enforce onboarding/budget for protected routes (skip assets/public)
     if not (is_public_prefix or is_asset_request):
-        # 1) Always require user profile (department) BEFORE any budget checks
+        # 1) Always require user profile BEFORE any budget checks
         try:
             dept = budget_service.get_user_department(user_email)
         except Exception as ex:
             logging.exception("[guard] missing_department_error path=%s user=%s error=%s", path, user_email, ex)
-            return RedirectResponse(url="/setup_department", status_code=302)
+            return RedirectResponse(url="/setup_profile", status_code=302)
         if not dept:
             logging.info("[guard] missing_department path=%s user=%s", path, user_email)
-            return RedirectResponse(url="/setup_department", status_code=302)
+            return RedirectResponse(url="/setup_profile", status_code=302)
 
         # 2) Budget checks only after department exists (feature-flagged)
         if config.Default.BUDGET_CHECK_ENABLED:
@@ -250,7 +252,7 @@ async def set_request_context(request: Request, call_next):
                 dept_budget = budget_service.get_department_budget(dept)
                 if dept_budget is None:
                     logging.info("[budget] missing_budget path=%s user=%s dept=%s", path, user_email, dept)
-                    return RedirectResponse(url="/budget_exceeded", status_code=302)
+                    return RedirectResponse(url="/access_restricted", status_code=302)
 
                 monthly_cost = budget_service.get_monthly_cloud_cost()
                 # Require cost availability in all environments
@@ -343,7 +345,7 @@ async def get_media_proxy(request: Request, bucket_name: str, object_path: str):
 @app.get("/")
 def home() -> RedirectResponse:
     try:
-        return RedirectResponse(url="/home")
+        return RedirectResponse(url="/welcome")
     except Exception as ex:
         logging.exception("[unhandled] redirect_home_failed error=%s", ex)
         return JSONResponse(status_code=500, content={"error": "redirect_home_failed"})
