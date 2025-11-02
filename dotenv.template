@@ -76,6 +76,12 @@ PROJECT_ID=
 #### Budget & Billing
 # Enable/disable budget guard ("true"/"false", defaults to true)
 #BUDGET_CHECK_ENABLED=true
+# Budget scope: "department" (default) or "project". In project mode, onboarding is skipped
+# and a single budget document is used for the entire project.
+#BUDGET_SCOPE=department
+# When BUDGET_SCOPE=project, the budgets collection document key to read
+# for the project-level budget amount.
+#BUDGET_PROJECT_KEY=creative-studio-budget
 # Firestore DB and collections for budgets feature
 #BUDGET_DB_ID=creative-studio-budget-allocation
 #BUDGET_USERS_COLLECTION=users

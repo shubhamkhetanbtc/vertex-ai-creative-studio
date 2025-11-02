@@ -236,41 +236,67 @@ async def set_request_context(request: Request, call_next):
 
     # Enforce onboarding/budget for protected routes (skip assets/public)
     if not (is_public_prefix or is_asset_request):
-        # 1) Always require user profile BEFORE any budget checks
-        try:
-            dept = budget_service.get_user_department(user_email)
-        except Exception as ex:
-            logging.exception("[guard] missing_department_error path=%s user=%s error=%s", path, user_email, ex)
-            return RedirectResponse(url="/setup_profile", status_code=302)
-        if not dept:
-            logging.info("[guard] missing_department path=%s user=%s", path, user_email)
-            return RedirectResponse(url="/setup_profile", status_code=302)
-
-        # 2) Budget checks only after department exists (feature-flagged)
-        if config.Default.BUDGET_CHECK_ENABLED:
-            try:
-                dept_budget = budget_service.get_department_budget(dept)
-                if dept_budget is None:
-                    logging.info("[budget] missing_budget path=%s user=%s dept=%s", path, user_email, dept)
+        # Branch by budget scope
+        scope = config.Default.BUDGET_SCOPE
+        if scope == "project":
+            # In project mode, skip profile setup and use a single project budget key
+            if config.Default.BUDGET_CHECK_ENABLED:
+                try:
+                    project_budget = budget_service.get_project_budget()
+                    if project_budget is None:
+                        logging.info("[budget] missing_project_budget path=%s user=%s key=%s", path, user_email, config.Default.BUDGET_PROJECT_KEY)
+                        return RedirectResponse(url="/access_restricted", status_code=302)
+                    monthly_cost = budget_service.get_monthly_cloud_cost()
+                    if monthly_cost is None:
+                        logging.info(
+                            "[budget] cost_unavailable path=%s user=%s billing_project=%s dataset=%s table=%s",
+                            path, user_email, config.Default.BILLING_PROJECT_ID, config.Default.BILLING_DATASET, config.Default.BILLING_TABLE,
+                        )
+                        return RedirectResponse(url="/access_restricted", status_code=302)
+                    if monthly_cost > float(project_budget):
+                        logging.info(
+                            "[budget] over_budget_project path=%s user=%s cost=%.2f budget=%.2f",
+                            path, user_email, monthly_cost, float(project_budget),
+                        )
+                        return RedirectResponse(url="/access_restricted", status_code=302)
+                except Exception as ex:
+                    logging.exception("[budget] evaluation_failed_project path=%s user=%s error=%s", path, user_email, ex)
                     return RedirectResponse(url="/access_restricted", status_code=302)
+        else:
+            # Department mode: require user profile BEFORE any budget checks
+            try:
+                dept = budget_service.get_user_department(user_email)
+            except Exception as ex:
+                logging.exception("[guard] missing_department_error path=%s user=%s error=%s", path, user_email, ex)
+                return RedirectResponse(url="/setup_profile", status_code=302)
+            if not dept:
+                logging.info("[guard] missing_department path=%s user=%s", path, user_email)
+                return RedirectResponse(url="/setup_profile", status_code=302)
 
-                monthly_cost = budget_service.get_monthly_cloud_cost()
-                # Require cost availability in all environments
-                if monthly_cost is None:
-                    logging.info(
-                        "[budget] cost_unavailable path=%s user=%s dept=%s billing_project=%s dataset=%s table=%s",
-                        path, user_email, dept, config.Default.BILLING_PROJECT_ID, config.Default.BILLING_DATASET, config.Default.BILLING_TABLE,
-                    )
-                    return RedirectResponse(url="/budget_exceeded", status_code=302)
-                if monthly_cost is not None and monthly_cost > float(dept_budget):
-                    logging.info(
-                        "[budget] over_budget path=%s user=%s dept=%s cost=%.2f budget=%.2f",
-                        path, user_email, dept, monthly_cost, float(dept_budget),
-                    )
-                    return RedirectResponse(url="/budget_exceeded", status_code=302)
-            except Exception as ex:  # defensive catch: never 500 on guard
-                logging.exception("[budget] evaluation_failed path=%s user=%s error=%s", path, user_email, ex)
-                return RedirectResponse(url="/budget_exceeded", status_code=302)
+            if config.Default.BUDGET_CHECK_ENABLED:
+                try:
+                    dept_budget = budget_service.get_department_budget(dept)
+                    if dept_budget is None:
+                        logging.info("[budget] missing_budget path=%s user=%s dept=%s", path, user_email, dept)
+                        return RedirectResponse(url="/access_restricted", status_code=302)
+
+                    monthly_cost = budget_service.get_monthly_cloud_cost()
+                    # Require cost availability in all environments
+                    if monthly_cost is None:
+                        logging.info(
+                            "[budget] cost_unavailable path=%s user=%s dept=%s billing_project=%s dataset=%s table=%s",
+                            path, user_email, dept, config.Default.BILLING_PROJECT_ID, config.Default.BILLING_DATASET, config.Default.BILLING_TABLE,
+                        )
+                        return RedirectResponse(url="/access_restricted", status_code=302)
+                    if monthly_cost is not None and monthly_cost > float(dept_budget):
+                        logging.info(
+                            "[budget] over_budget path=%s user=%s dept=%s cost=%.2f budget=%.2f",
+                            path, user_email, dept, monthly_cost, float(dept_budget),
+                        )
+                        return RedirectResponse(url="/access_restricted", status_code=302)
+                except Exception as ex:  # defensive catch: never 500 on guard
+                    logging.exception("[budget] evaluation_failed path=%s user=%s error=%s", path, user_email, ex)
+                    return RedirectResponse(url="/access_restricted", status_code=302)
 
     # Continue request
     response = await call_next(request)

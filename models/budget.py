@@ -82,6 +82,25 @@ def get_department_budget(department: str) -> Optional[float]:
         return None
 
 
+def get_project_budget() -> Optional[float]:
+    """Reads the numeric monthly budget for the whole project when in project mode.
+
+    Collection: budgets
+    Document ID: cfg.BUDGET_PROJECT_KEY (default: "creative-studio-budget")
+    Field: amount (number)
+    """
+    db = _budget_db()
+    doc = db.collection(cfg.BUDGETS_COLLECTION).document(cfg.BUDGET_PROJECT_KEY).get()
+    if not doc.exists:
+        return None
+    data = doc.to_dict() or {}
+    amount = data.get("amount")
+    try:
+        return float(amount) if amount is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
 def set_department_budget(department: str, amount: float) -> None:
     """Sets the monthly budget for a department."""
     db = _budget_db()
@@ -205,10 +224,31 @@ def get_monthly_cloud_cost(project_id: Optional[str] = None) -> Optional[float]:
 def evaluate_budget(email: str) -> BudgetStatus:
     """Computes the budget status for the given user email.
 
+    In department mode (default):
     - Finds user's department.
     - Reads department budget.
     - Computes current month cost.
+
+    In project mode:
+    - Skips department lookup.
+    - Reads project budget by key.
+    - Computes current month cost.
     """
+    if cfg.BUDGET_SCOPE == "project":
+        budget = get_project_budget()
+        if budget is None:
+            return BudgetStatus(email=email, department=None, budget=None, monthly_cost=None, within_budget=None, error="missing_budget")
+        cost = get_monthly_cloud_cost()
+        if cost is None:
+            return BudgetStatus(email=email, department=None, budget=budget, monthly_cost=None, within_budget=None, error="cost_unavailable")
+        return BudgetStatus(
+            email=email,
+            department=None,
+            budget=budget,
+            monthly_cost=cost,
+            within_budget=(cost <= budget),
+        )
+    # Department mode (default)
     dept = get_user_department(email)
     if not dept:
         return BudgetStatus(email=email, department=None, budget=None, monthly_cost=None, within_budget=None, error="missing_user")

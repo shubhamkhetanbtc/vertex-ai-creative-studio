@@ -9,6 +9,7 @@ from components.dialog import dialog, dialog_actions  # use shared dialog compon
 
 from components.header import header
 from components.page_scaffold import page_frame, page_scaffold
+from config.default import Default
 from models import budget as budget_service
 from state.state import AppState
 
@@ -66,19 +67,25 @@ def on_budget_input(e):
 def access_restricted_content():
     app = me.state(AppState)
     st = me.state(PageState)
+    cfg = Default()
     # If user has no department, bounce them to setup immediately
-    try:
-        dept = budget_service.get_user_department(app.user_email)
-    except Exception:
-        dept = None
-    if not dept:
-        me.navigate("/setup_profile")
-        return
+    dept: str | None = None
+    if cfg.BUDGET_SCOPE != "project":
+        try:
+            dept = budget_service.get_user_department(app.user_email)
+        except Exception:
+            dept = None
+        if not dept:
+            me.navigate("/setup_profile")
+            return
     # Default to user's department and load its current budget on first render
     if not st.selected_department:
         st.selected_department = dept
         try:
-            st.current_budget = budget_service.get_department_budget(st.selected_department)
+            if cfg.BUDGET_SCOPE == "project":
+                st.current_budget = budget_service.get_project_budget()
+            else:
+                st.current_budget = budget_service.get_department_budget(st.selected_department)
         except Exception:
             st.current_budget = None
         # Load current monthly cloud cost
@@ -114,13 +121,23 @@ def access_restricted_content():
         with me.box(style=me.Style(display="flex", justify_content="center", margin=me.Margin(top=12))):
             if budget_missing:
                 me.text(
-                    "Access is blocked because no budget is set for your department. Please contact an admin to set a budget.",
+                    (
+                        "Access is blocked because no budget is set for the project. "
+                        "Please contact an admin to set a budget."
+                    ) if cfg.BUDGET_SCOPE == "project" else (
+                        "Access is blocked because no budget is set for your department. "
+                        "Please contact an admin to set a budget."
+                    ),
                     type="body-1",
                     style=me.Style(color=me.theme_var("error")),
                 )
             else:
                 me.text(
-                    "Access is temporarily blocked because monthly costs exceed your department’s budget.",
+                    (
+                        "Access is temporarily blocked because monthly costs exceed the project’s budget."
+                    ) if cfg.BUDGET_SCOPE == "project" else (
+                        "Access is temporarily blocked because monthly costs exceed your department’s budget."
+                    ),
                     type="body-1",
                     style=me.Style(color=me.theme_var("error")),
                 )
@@ -149,7 +166,7 @@ def access_restricted_content():
                     ):
                         me.text(label, type="subtitle-2", style=me.Style(color=me.theme_var("error")))
                         me.text(value, type="body-1", style=me.Style(color=me.theme_var("error")))
-                dept_label = st.selected_department or dept or "—"
+                dept_label = st.selected_department or dept or ("Project" if cfg.BUDGET_SCOPE == "project" else "—")
                 cost_label = (
                     f"€{st.current_cost:,.2f}" if st.current_cost is not None else "Unavailable"
                 )
@@ -158,13 +175,18 @@ def access_restricted_content():
                 )
                 _row("User email", app.user_email)
                 me.divider()
-                _row("Department", dept_label)
-                me.divider()
+                if cfg.BUDGET_SCOPE == "project":
+                    _row("Scope", "Project")
+                    me.divider()
+                else:
+                    _row("Department", dept_label)
+                    me.divider()
                 _row("Current monthly cost", cost_label)
                 me.divider()
                 _row("Budget", budget_label)
                 with me.box(style=me.Style(display="flex", justify_content="flex-end", margin=me.Margin(top=8))):
-                    if role == "admin":
+                    # Hide update button entirely in project mode per requirement
+                    if role == "admin" and cfg.BUDGET_SCOPE != "project":
                         me.button(
                             "Update Budget",
                             on_click=_open_edit_dialog,
@@ -182,8 +204,8 @@ def access_restricted_content():
                 me.text(st.error_message, style=me.Style(margin=me.Margin(top=12)))
                 with dialog_actions():  # pylint: disable=E1129:not-context-manager
                     me.button("Close", on_click=_close_error_dialog, type="flat")
-        # Update Budget modal
-        if st.edit_dialog_open:
+    # Update Budget modal (disabled in project scope)
+    if st.edit_dialog_open and Default().BUDGET_SCOPE != "project":
             with dialog(is_open=st.edit_dialog_open):  # pylint: disable=E1129:not-context-manager
                 me.text("Update Budget", type="headline-6", style=me.Style(font_family="Google Sans"))
                 with me.box(style=me.Style(display="flex", flex_direction="column", gap=12, margin=me.Margin(top=12))):

@@ -186,6 +186,11 @@ class Default:
     )
     BUDGET_USERS_COLLECTION: str = os.environ.get("BUDGET_USERS_COLLECTION", "users")
     BUDGETS_COLLECTION: str = os.environ.get("BUDGETS_COLLECTION", "budgets")
+    # Budget scope: "department" (default) or "project". In project mode, onboarding is skipped
+    # and a single budget document is used for the entire project.
+    BUDGET_SCOPE: str = os.environ.get("BUDGET_SCOPE", "department").strip().lower()
+    # The document key to use from the budgets collection when BUDGET_SCOPE=project
+    BUDGET_PROJECT_KEY: str = os.environ.get("BUDGET_PROJECT_KEY", "creative-studio-budget")
     # Comma-separated department list for onboarding (e.g., "Sales,Marketing,Engineering")
     BUDGET_DEPARTMENTS: str = os.environ.get("BUDGET_DEPARTMENTS", "Sales,Marketing,Development")
 
