@@ -96,3 +96,69 @@ variable "sleep_time" {
   type        = number
   default     = 45
 }
+
+# Application environment ("", "local", "dev", "prod")
+variable "app_env" {
+  description = "Application environment label used by the app for behavior toggles."
+  type        = string
+  default     = ""
+}
+
+# Budget enforcement toggle
+variable "budget_check_enabled" {
+  description = "Enable budget checks and gating."
+  type        = bool
+  default     = true
+}
+
+# Firestore DB and collections used for budgets feature
+variable "budget_db_id" {
+  description = "Firestore database ID for budgets and users collections."
+  type        = string
+  default     = "creative-studio-budget-allocation"
+}
+
+variable "budget_users_collection" {
+  description = "Firestore collection name for users to store department mapping."
+  type        = string
+  default     = "users"
+}
+
+variable "budgets_collection" {
+  description = "Firestore collection name for department budgets."
+  type        = string
+  default     = "budgets"
+}
+
+# BigQuery billing export identifiers (optional; if unset, cost will be unavailable)
+variable "billing_project_id" {
+  description = "Project ID that hosts the BigQuery billing export (defaults to service project if not provided)."
+  type        = string
+  default     = null
+}
+
+variable "billing_dataset" {
+  description = "BigQuery dataset for the billing export."
+  type        = string
+  default     = null
+}
+
+variable "billing_table" {
+  description = "BigQuery table for the billing export (e.g., gcp_billing_export)."
+  type        = string
+  default     = null
+}
+
+# Optional analytics
+variable "ga_measurement_id" {
+  description = "Google Analytics measurement ID (optional)."
+  type        = string
+  default     = null
+}
+
+# Comma-separated departments list for onboarding (e.g., "Sales,Marketing,Engineering")
+variable "budget_departments" {
+  description = "Comma-separated list of departments for onboarding."
+  type        = string
+  default     = "Sales,Marketing,Development"
+}

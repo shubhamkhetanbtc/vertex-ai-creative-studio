@@ -181,6 +181,28 @@ class Default:
         ],
     )
 
+    # Billing export (for budget checks)
+    BILLING_PROJECT_ID: Optional[str] = os.environ.get("BILLING_PROJECT_ID")
+    BILLING_DATASET: Optional[str] = os.environ.get("BILLING_DATASET")
+    BILLING_TABLE: Optional[str] = os.environ.get("BILLING_TABLE")
+
+    # Budget Firestore database and collections
+    BUDGET_DB_ID: str = os.environ.get(
+        "BUDGET_DB_ID", "creative-studio-budget-allocation"
+    )
+    BUDGET_USERS_COLLECTION: str = os.environ.get("BUDGET_USERS_COLLECTION", "users")
+    BUDGETS_COLLECTION: str = os.environ.get("BUDGETS_COLLECTION", "budgets")
+    # Budget scope: "department" (default) or "project". In project mode, onboarding is skipped
+    # and a single budget document is used for the entire project.
+    BUDGET_SCOPE: str = os.environ.get("BUDGET_SCOPE", "department").strip().lower()
+    # The document key to use from the budgets collection when BUDGET_SCOPE=project
+    BUDGET_PROJECT_KEY: str = os.environ.get("BUDGET_PROJECT_KEY", "creative-studio-budget")
+    # Comma-separated department list for onboarding (e.g., "Sales,Marketing,Engineering")
+    BUDGET_DEPARTMENTS: str = os.environ.get("BUDGET_DEPARTMENTS", "Sales,Marketing,Development")
+
+    # Feature flag to disable budget checks if needed
+    BUDGET_CHECK_ENABLED: bool = os.environ.get("BUDGET_CHECK_ENABLED", "true").lower() == "true"
+
 
 def get_welcome_page_config():
     with open("config/navigation.json", "r") as f:

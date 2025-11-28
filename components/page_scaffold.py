@@ -42,7 +42,9 @@ def page_scaffold(page_name: str):
 
     theme_manager(theme=app_state.theme_mode, on_theme_load=on_theme_load)
 
-    sidenav("")
+    # Keep nav behavior aligned with existing code; minimal changes
+    if page_name not in ("setup_profile", "access_restricted"):
+        sidenav("")
 
     with me.box(
         style=me.Style(

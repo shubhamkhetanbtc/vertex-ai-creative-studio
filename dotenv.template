@@ -1,23 +1,92 @@
-#### App
-# PROJECT_ID is required, Google Cloud Project
+#### Core app
+# Required: Google Cloud project ID
 PROJECT_ID=
-# LOCATION defaults to us-central1
-#LOCATION=us-central1 
-# MODEL_ID defaults to gemini-2.0-flash
-#MODEL_ID= 
-# GENMEDIA_BUCKET defaults to: {PROJECT_ID}-assets
-#GENMEDIA_BUCKET=
+# Optional: region (defaults to us-central1)
+#LOCATION=us-central1
+# Optional: default Gemini model (defaults to gemini-2.5-flash)
+#MODEL_ID=gemini-2.5-flash
+# Optional: app environment ("", "local", "dev", "prod")
+#APP_ENV=
+# Optional: server bind host/port for local dev
+#HOST=0.0.0.0
+#PORT=8080
+# Optional: enable extra logs in Mesop local dev ("true"/"false")
+#DEBUG_MODE=false
+# Optional: Google Analytics Measurement ID
+#GA_MEASUREMENT_ID=
+
+#### Identity / impersonation (for signed GCS URLs)
+# Optional: service account email to impersonate when generating signed URLs
+#SERVICE_ACCOUNT_EMAIL=
+
+#### Storage buckets and assets
+# Optional overrides; defaults derive from PROJECT_ID if unset
+#GENMEDIA_BUCKET=${PROJECT_ID}-assets
+#VIDEO_BUCKET=${PROJECT_ID}-assets/videos
+#IMAGE_BUCKET=${PROJECT_ID}-assets/images
+#MEDIA_BUCKET=${PROJECT_ID}-assets
+# Optional: if set, used to resolve public asset URLs for About page content
+#GCS_ASSETS_BUCKET=
+
+#### Library and UI
+# Optional: items per page in Library (defaults to 15)
+#LIBRARY_MEDIA_PER_PAGE=15
+# Optional: proxy GCS media through the app for caching ("true"/"false", defaults to true)
+#USE_MEDIA_PROXY=true
+# Optional: Firestore DB and collections for generated media and sessions
+#GENMEDIA_FIREBASE_DB=(default)
+#GENMEDIA_COLLECTION_NAME=genmedia
+#SESSIONS_COLLECTION_NAME=sessions
+
+#### Gemini
+# Optional: image generation model and location
+#GEMINI_IMAGE_GEN_MODEL=gemini-2.5-flash-image
+#GEMINI_IMAGE_GEN_LOCATION=global
+# Optional: audio analysis model
+#GEMINI_AUDIO_ANALYSIS_MODEL_ID=gemini-2.5-flash
 
 #### Veo
-# VEO_PROJECT_ID defaults to PROJECT_ID if not present
-#VEO_PROJECT_ID=
-# VEO_MODEL defaults to veo-2.0-generate-001 if not present
-#VEO_MODEL_ID=
-# VEO_EXP_MODEL_ID defaults to veo-2.0-generate-exp if not present
-#VEO_EXP_MODEL_ID=
+# Optional: Veo model/project selections
+#VEO_MODEL_ID=veo-2.0-generate-001
+#VEO_PROJECT_ID=${PROJECT_ID}
+#VEO_EXP_MODEL_ID=veo-3.0-generate-001
+#VEO_EXP_FAST_MODEL_ID=veo-3.0-fast-generate-001
+#VEO_EXP_PROJECT_ID=${PROJECT_ID}
 
-#### Lyria
-# LYRIA_MODEL_VERSION defaults to lyria-base-001
-#LYRIA_MODEL_VERSION=
-# LYRIA_PROJECT_ID defaults to PROJECT_ID f not present
-#LYRIA_PROJECT_ID=
+#### Virtual Try-On (VTO)
+#VTO_LOCATION=us-central1
+#VTO_MODEL_ID=virtual-try-on-preview-08-04
+#GENMEDIA_VTO_MODEL_COLLECTION_NAME=genmedia-vto-model
+#GENMEDIA_VTO_CATALOG_COLLECTION_NAME=genmedia-vto-catalog
+
+#### Character Consistency
+#CHARACTER_CONSISTENCY_VEO_MODEL=veo-3.0-fast-generate-001
+#CHARACTER_CONSISTENCY_GEMINI_MODEL=${MODEL_ID}
+
+#### Lyria (music)
+#LYRIA_LOCATION=us-central1
+#LYRIA_MODEL_VERSION=lyria-002
+#LYRIA_PROJECT_ID=${PROJECT_ID}
+
+#### Imagen
+#MODEL_IMAGEN_PRODUCT_RECONTEXT=imagen-product-recontext-preview-06-30
+#IMAGEN_GENERATED_SUBFOLDER=generated_images
+#IMAGEN_EDITED_SUBFOLDER=edited_images
+
+#### Budget & Billing
+# Enable/disable budget guard ("true"/"false", defaults to true)
+#BUDGET_CHECK_ENABLED=true
+# Budget scope: "department" (default) or "project". In project mode, onboarding is skipped
+# and a single budget document is used for the entire project.
+#BUDGET_SCOPE=department
+# When BUDGET_SCOPE=project, the budgets collection document key to read
+# for the project-level budget amount.
+#BUDGET_PROJECT_KEY=creative-studio-budget
+# Firestore DB and collections for budgets feature
+#BUDGET_DB_ID=creative-studio-budget-allocation
+#BUDGET_USERS_COLLECTION=users
+#BUDGETS_COLLECTION=budgets
+# BigQuery billing export (required when BUDGET_CHECK_ENABLED=true)
+#BILLING_PROJECT_ID=
+#BILLING_DATASET=
+#BILLING_TABLE=
